@@ -12,7 +12,7 @@ git clone https://github.com/mkomod/npl
 
 We replicated the example used in the paper, taking a mixture of 3 means at 0, 2 and 4.
 
-![fig](./density.png)
+![fig](./density.jpg)
 
 
 ## References

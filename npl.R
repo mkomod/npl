@@ -37,8 +37,7 @@ res.fil <- res[ , apply(res, 2, function(r) !any(which(is.na(r))))]
 apply(res.fil, 1, mean)
 f1 <- MASS::kde2d(res.fil[4, ], res.fil[5, ], lims=c(-2,6,-2,6), n = 2000)
 f2 <- MASS::kde2d(res.fil[5, ], res.fil[6, ], lims=c(-2,6,-2,6), n = 2000)
-png("density.png", width=600, height=600)
+jpeg("density.jpg", width=500, height=500)
 image(f1, xlim=c(-2, 6), ylim=c(-2, 6), col=hcl.colors(12))
 dev.off()
-image(f2, xlim=c(-2, 6), ylim=c(-2, 6), col=hcl.colors(12))
 
