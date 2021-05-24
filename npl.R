@@ -1,68 +1,44 @@
 # NPL for Gaussian Mixture model, see: Fong et al 2019
-library(mvtnorm)
 library(dist)		# devtools::install_github("mkomod/dist")
 Rcpp::sourceCpp("./npl.cpp")
 set.seed(1)
 
 # Test data
-p <- c(0.3, 0.3, 0.4)
-mu <- c(-3, 0, 3)
-sig <- c(0.2, 0.2, 0.2)
+p <- c(0.1, 0.3, 0.7)
+mu <- c(0, 2, 4)
+sig <- c(1, 1, 1)
 
-n <- 100
+n <- 1000
 g <- sample(1:3, n, prob=p, replace=T)
 y <- rnorm(n, mu[g], sig[g])
+w <- rdirichlet(1, rep(1, n))
 plot(density(y))
 
-
-# NPL
-gmm_ll <- function(y, p, mu, sig) 
-{
-    res <- sapply(seq_along(p), function(k) p[k] * dnorm(y, mu[k], sig[k]))
-    return(-log(sum(res)))
-}
-
-
-J <- function(y, w, p, mu, sig) 
-{
-    l <- matrix(sapply(y, function(y) gmm_ll(y, p, mu, sig)), ncol=1)
-    return(as.double(w %*% l))
-}
-
-J.grad <- function(y, w, p, mu, sig) 
-{
-    denom <- sum(sapply(seq_along(p), function(k) p[k] * dnorm(y, mu[k], sig[k])))
-    d.p <- sapply(seq_along(p), function(k) {
-	return(matrix(-dnorm(y, mu[k], sig[k]), ncol=1) / denom)
-    })
-    d.mu <- sapply(seq_along(mu), function(k) {
-	return(-p[k] * dnorm_dMu(y, mu[k], sig[k]) / denom)
-    })
-    d.sig <- sapply(seq_along(sig), function(k) {
-	return(-p[k] * dnorm_dSig(y, mu[k], sig[k]) / denom)
-    })
-    return(c(w %*% d.p, w %*% d.mu, w %*% d.sig))
-}
-
-J.fn <- function(pr, y, w) J(y, w, pr[1:3]/sum(pr[1:3]), pr[4:6], pr[7:9])
-J.gr <- function(pr, y, w) J.grad(y, w, pr[1:3]/sum(pr[1:3]), pr[4:6], pr[7:9])
-
 a <- 1
-a.t <- 100
-B <- 5000
-
+a.t <- 500
+B <- 10000
 res <- sapply(1:B, function(i) {
-    w <- rdirichlet(1, c(rep(a, n), rep(a/a.t, a.t)))
-    y.c <- c(y, runif(a.t, -6, 6))
-    p.init <- c(runif(3), rnorm(3, sd=3), rgamma(3, 1, 1))
+    w <- dist::rdirichlet(1, c(rep(a, n), rep(a/a.t, a.t)))
+    y.c <- c(y, runif(a.t, -2, 6))
+    p.init <- c(rdirichlet(1 , rep(1,3)), rnorm(3, sd=3), rgamma(3, 1, 1))
     p.opt <- tryCatch({
-	p.opt <- optim(p.init,fn=J.fn, gr=J.gr, method="L-BFGS-B",
-	      lower=c(5e-2, 5e-2, 5e-2, -100, -100, -100, 1e-2, 1e-2, 1e-2),
-	      upper=c(3, 3, 3,  100,  100,  100, 10, 10, 10), y=y.c, w=w)$par
+	p.opt <- optim(p.init,fn=J_fn, gr=J_gr, method="L-BFGS-B",
+	      lower=c(5e-2, 5e-2, 5e-2, -100, -100, -100, 5e-2, 5e-2, 5e-2),
+	      upper=c(  10,   10,   10,  100,  100,  100,   10,   10,   10), 
+	      y=y.c, w=w, k=3)$par
 	p.opt[1:3] <- p.opt[1:3]/sum(p.opt[1:3])
 	return(p.opt)
-    }, error = function(e) return(rep(NA, 9)))
+    }, error = function(e) { print(e); return(rep(NA, 9)) })
+    print(i)
     return(p.opt)
 })
 
+res.fil <- res[ , apply(res, 2, function(r) !any(which(is.na(r))))]
+apply(res.fil, 1, mean)
+f1 <- MASS::kde2d(res.fil[4, ], res.fil[5, ], lims=c(-2,6,-2,6), n = 2000)
+f2 <- MASS::kde2d(res.fil[5, ], res.fil[6, ], lims=c(-2,6,-2,6), n = 2000)
+png("density.png", width=600, height=600)
+image(f1, xlim=c(-2, 6), ylim=c(-2, 6), col=hcl.colors(12))
+dev.off()
+image(f2, xlim=c(-2, 6), ylim=c(-2, 6), col=hcl.colors(12))
 
